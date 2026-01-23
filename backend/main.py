@@ -11,6 +11,9 @@ import shutil
 import uuid
 import os
 import base64
+import json
+import re
+from pathlib import Path
 
 app = FastAPI()
 
@@ -27,9 +30,15 @@ IMG_DIR = "generated_images_temp"
 if not os.path.exists(IMG_DIR):
     os.makedirs(IMG_DIR)
 
+# Ensure saved stories directory exists
+STORIES_DIR = "saved_stories"
+if not os.path.exists(STORIES_DIR):
+    os.makedirs(STORIES_DIR)
+
 # Mount the static directory to serve images
 from fastapi.staticfiles import StaticFiles
 app.mount("/images", StaticFiles(directory=IMG_DIR), name="images")
+app.mount("/stories", StaticFiles(directory=STORIES_DIR), name="stories")
 
 class InputResponse(BaseModel):
     status: str
@@ -154,6 +163,134 @@ async def generate_image_endpoint(
 
     except Exception as e:
         print(f"Error generating image: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+def sanitize_filename(name):
+    return re.sub(r'[<>:"/\\|?*]', '', name).strip()
+
+class SaveStoryRequest(BaseModel):
+    title: str
+    cover_image_url: str
+    chapters: List[dict] # {text: str, image_url: str}
+
+@app.post("/api/save-story")
+async def save_story_endpoint(story: SaveStoryRequest):
+    try:
+        # Create a safe folder name
+        safe_title = sanitize_filename(story.title)
+        # Add a UUID suffix to avoid collisions if titles are same
+        unique_id = str(uuid.uuid4())[:8]
+        folder_name = f"{safe_title}_{unique_id}"
+        story_path = os.path.join(STORIES_DIR, folder_name)
+        
+        os.makedirs(story_path, exist_ok=True)
+
+        # 1. Download/Copy images
+        # Helper to handle image moving
+        def process_image(url, prefix):
+            # Extract filename from URL (assuming /images/filename.png)
+            if "/images/" in url:
+                original_filename = url.split("/images/")[-1]
+                source_path = os.path.join(IMG_DIR, original_filename)
+                
+                new_filename = f"{prefix}_{original_filename}"
+                dest_path = os.path.join(story_path, new_filename)
+                
+                if os.path.exists(source_path):
+                    shutil.copy2(source_path, dest_path)
+                    return new_filename
+                else:
+                    print(f"Warning: Image source not found: {source_path}")
+                    return url
+            return url
+
+        # Process Cover
+        saved_cover = process_image(story.cover_image_url, "cover")
+        
+        # Process Chapters
+        saved_chapters = []
+        for idx, chap in enumerate(story.chapters):
+            saved_img = process_image(chap['image_url'], f"chap_{idx+1}")
+            saved_chapters.append({
+                "text": chap['text'],
+                "image": saved_img
+            })
+
+        # 2. Save story.json
+        final_story_data = {
+            "title": story.title,
+            "cover_image": saved_cover,
+            "chapters": saved_chapters,
+            "id": folder_name
+        }
+        
+        with open(os.path.join(story_path, "story.json"), "w", encoding="utf-8") as f:
+            json.dump(final_story_data, f, ensure_ascii=False, indent=2)
+
+        # 3. Generate index.html (Standalone Site)
+        template_path = os.path.join("backend", "template_site.html")
+        if os.path.exists(template_path):
+            shutil.copy2(template_path, os.path.join(story_path, "index.html"))
+
+        return {
+            "status": "success",
+            "message": "História salva com sucesso!",
+            "story_id": folder_name,
+            "path": os.path.abspath(story_path)
+        }
+
+    except Exception as e:
+        print(f"Error saving story: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/stories")
+async def get_stories():
+    try:
+        stories = []
+        if os.path.exists(STORIES_DIR):
+            for folder in os.listdir(STORIES_DIR):
+                folder_path = os.path.join(STORIES_DIR, folder)
+                json_path = os.path.join(folder_path, "story.json")
+                
+                if os.path.isdir(folder_path) and os.path.exists(json_path):
+                    try:
+                        with open(json_path, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                            # Fix image URLs for serving
+                            data["cover_image"] = f"/stories/{folder}/{data['cover_image']}"
+                            # We don't need all chapters for the list, just metadata
+                            stories.append({
+                                "id": folder,
+                                "title": data["title"],
+                                "cover": data["cover_image"]
+                            })
+                    except Exception:
+                        continue
+        return stories
+    except Exception as e:
+        print(f"Error listing stories: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/stories/{story_id}")
+async def get_story_details(story_id: str):
+    try:
+        folder_path = os.path.join(STORIES_DIR, story_id)
+        json_path = os.path.join(folder_path, "story.json")
+        
+        if not os.path.exists(json_path):
+            raise HTTPException(status_code=404, detail="Story not found")
+            
+        with open(json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            
+        # Fix image URLs to be absolute server paths for the frontend
+        data["cover_image"] = f"/stories/{story_id}/{data['cover_image']}"
+        for chap in data["chapters"]:
+            chap["image"] = f"/stories/{story_id}/{chap['image']}"
+            
+        return data
+    except Exception as e:
+        print(f"Error loading story: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
