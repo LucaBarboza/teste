@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Minha História Imaginária</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Lora:ital,wght@0,400;1,400&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #d35400;
+            --bg: #0f0f0f;
+            --paper: #f4ecd8;
+        }
+
+        body {
+            background: var(--bg);
+            color: #333;
+            font-family: 'Lora', serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-image: radial-gradient(circle at center, #1a1a1a 0%, #000 100%);
+        }
+
+        .book {
+            position: relative;
+            width: 1000px;
+            height: 650px;
+            background: var(--paper);
+            border-radius: 5px;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8);
+            display: flex;
+            overflow: hidden;
+        }
+
+        .page {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: none;
+            grid-template-columns: 1fr 1fr;
+            animation: fadeIn 0.8s ease;
+        }
+
+        .page.active {
+            display: grid;
+        }
+
+        .left-side {
+            padding: 4rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            border-right: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .right-side {
+            background: #000;
+            overflow: hidden;
+        }
+
+        .right-side img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .part-num {
+            font-family: 'Cinzel', serif;
+            color: var(--primary);
+            margin-bottom: 1rem;
+            font-weight: bold;
+        }
+
+        .story-text {
+            font-size: 1.1rem;
+            line-height: 1.8;
+            text-align: justify;
+        }
+
+        .story-text::first-letter {
+            font-size: 2.5rem;
+            float: left;
+            margin-right: 8px;
+            color: var(--primary);
+            font-family: 'Cinzel', serif;
+        }
+
+        .image-prompt {
+            font-size: 0.8rem;
+            color: #777;
+            margin-top: 1.5rem;
+            font-style: italic;
+            border-top: 1px solid rgba(0, 0, 0, 0.05);
+            padding-top: 0.5rem;
+        }
+
+        /* Capa Especial */
+        .cover-page {
+            grid-template-columns: 1fr !important;
+            text-align: center;
+        }
+
+        .cover-content {
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: var(--paper);
+            height: 100%;
+            width: 100%;
+        }
+
+        .cover-title {
+            font-family: 'Cinzel', serif;
+            font-size: 3.5rem;
+            color: var(--primary);
+            margin-bottom: 2rem;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+        }
+
+        .cover-img-container {
+            width: 80%;
+            height: 350px;
+            overflow: hidden;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .cover-img-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .controls {
+            margin-top: 2rem;
+            display: flex;
+            gap: 1rem;
+        }
+
+        button {
+            background: transparent;
+            border: 2px solid var(--primary);
+            color: white;
+            padding: 0.8rem 2rem;
+            cursor: pointer;
+            border-radius: 30px;
+            font-family: 'Cinzel';
+            transition: all 0.3s;
+        }
+
+        button:hover:not(:disabled) {
+            background: var(--primary);
+            box-shadow: 0 0 15px var(--primary);
+        }
+
+        button:disabled {
+            opacity: 0.3;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="book" id="book-container">
+        <!-- JS will inject content here -->
+    </div>
+
+    <div class="controls">
+        <button id="btnP" onclick="changePage(-1)" disabled>Anterior</button>
+        <button id="btnN" onclick="changePage(1)">Próximo</button>
+    </div>
+
+    <script>
+        let currentState = {
+            story: null,
+            page: 0,
+            total: 0
+        };
+
+        const bookEl = document.getElementById('book-container');
+        const btnP = document.getElementById('btnP');
+        const btnN = document.getElementById('btnN');
+
+        async function loadStory() {
+            try {
+                const response = await fetch('./story.json');
+                const data = await response.json();
+                currentState.story = data;
+                currentState.total = data.chapters.length; // 0=Cover
+                renderBook(data);
+            } catch (error) {
+                console.error("Erro loading:", error);
+                document.body.innerHTML = '<h1 style="color:white">Erro ao carregar história. Verifique story.json</h1>';
+            }
+        }
+
+        function renderBook(story) {
+            bookEl.innerHTML = '';
+
+            // 1. Cover
+            const coverDiv = document.createElement('div');
+            coverDiv.className = 'page cover-page active';
+            coverDiv.id = 'p0';
+            coverDiv.innerHTML = `
+                <div class="cover-content">
+                    <div class="cover-title">${story.title}</div>
+                    <div class="cover-img-container">
+                        <img src="${story.cover_image}">
+                    </div>
+                    <div style="margin-top: 2rem; font-family: 'Cinzel'; font-size: 1.2rem; color: #555;">
+                        Uma História Imaginária
+                    </div>
+                </div>
+            `;
+            bookEl.appendChild(coverDiv);
+
+            // 2. Chapters
+            story.chapters.forEach((chap, i) => {
+                const idx = i + 1;
+                const pageDiv = document.createElement('div');
+                pageDiv.className = 'page';
+                pageDiv.id = `p${idx}`;
+                pageDiv.innerHTML = `
+                    <div class="left-side">
+                        <div class="part-num">Capítulo ${idx}</div>
+                        <div class="story-text">${chap.text}</div>
+                    </div>
+                    <div class="right-side"><img src="${chap.image}"></div>
+                `;
+                bookEl.appendChild(pageDiv);
+            });
+        }
+
+        function changePage(d) {
+            const nextP = currentState.page + d;
+            if (nextP < 0 || nextP > currentState.total) return;
+
+            document.getElementById(`p${currentState.page}`).classList.remove('active');
+            currentState.page = nextP;
+            document.getElementById(`p${currentState.page}`).classList.add('active');
+
+            updateControls();
+        }
+
+        function updateControls() {
+            btnP.disabled = currentState.page === 0;
+            btnN.disabled = currentState.page === currentState.total;
+        }
+
+        loadStory();
+    </script>
+</body>
+
+</html>
