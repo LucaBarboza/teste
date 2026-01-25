@@ -3,269 +3,678 @@
 
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Minha História Imaginária</title>
-    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600&family=Lora:ital,wght@0,400;1,400&display=swap"
+    <!-- Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Lora:ital,wght@0,400;0,700;1,400&family=Inter:wght@300;400&display=swap"
         rel="stylesheet">
+
+    <!-- PageFlip Library -->
+    <script src="https://cdn.jsdelivr.net/npm/page-flip/dist/js/page-flip.browser.js"></script>
+
     <style>
+        /* --- Reset & Base --- */
+        * {
+            box-sizing: border-box;
+        }
+
         :root {
-            --primary: #d35400;
-            --bg: #0f0f0f;
-            --paper: #f4ecd8;
+            /* Tailwind Palette Approximation */
+            --bg-dark: #0f172a;
+            --paper-color: #fdfbf7;
+            --paper-border: #e3dccb;
+            --text-color: #1e293b;
+
+            --yellow-600: #ca8a04;
+            --yellow-500: #eab308;
+            --yellow-200: #fef08a;
+            --yellow-100: #fef9c3;
+
+            --slate-900: #0f172a;
+            --slate-800: #1e293b;
+            --slate-500: #64748b;
+            --slate-400: #94a3b8;
+            --slate-300: #cbd5e1;
+
+            --font-serif: 'Cinzel', serif;
+            --font-body: 'Lora', serif;
+            --font-sans: 'Inter', sans-serif;
         }
 
         body {
-            background: var(--bg);
-            color: #333;
-            font-family: 'Lora', serif;
+            margin: 0;
+            padding: 0;
+            background-color: #0f0f0f;
+            /* Fallback */
+            /* Exact gradient from index.css */
+            background-image:
+                radial-gradient(circle at 15% 50%, rgba(99, 102, 241, 0.15) 0%, transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(236, 72, 153, 0.15) 0%, transparent 25%);
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-            background-image: radial-gradient(circle at center, #1a1a1a 0%, #000 100%);
-        }
-
-        .book {
-            position: relative;
-            width: 1000px;
-            height: 650px;
-            background: var(--paper);
-            border-radius: 5px;
-            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8);
-            display: flex;
+            font-family: var(--font-body);
             overflow: hidden;
+            color: white;
         }
 
-        .page {
+        /* Add a base dark wash like the React app's parent div */
+        .app-bg-overlay {
             position: absolute;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.95);
+            /* Simulate the dark theme */
+            z-index: -1;
+        }
+
+        /* --- UI Controls --- */
+        .controls {
+            position: fixed;
+            top: 50%;
             width: 100%;
-            height: 100%;
+            transform: translateY(-50%);
+            z-index: 100;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            padding: 0 40px;
+        }
+
+        .btn-nav {
+            pointer-events: auto;
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            transition: all 0.3s;
+            padding: 20px;
+        }
+
+        .btn-nav:hover {
+            color: rgba(255, 255, 255, 0.8);
+            transform: scale(1.1);
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: rgba(255, 255, 255, 0.5);
+            font-family: var(--font-sans);
+            cursor: pointer;
+            z-index: 200;
+        }
+
+        .loading {
+            position: absolute;
+            font-family: var(--font-serif);
+            font-size: 1.5rem;
+            color: rgba(255, 255, 255, 0.5);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            50% {
+                opacity: 0.3;
+            }
+        }
+
+        /* --- FlipBook Container --- */
+        .flip-book {
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            /* shadow-2xl */
             display: none;
-            grid-template-columns: 1fr 1fr;
-            animation: fadeIn 0.8s ease;
         }
 
-        .page.active {
-            display: grid;
+        /* --- Page Styles --- */
+        .page {
+            background-color: var(--paper-color);
+            overflow: hidden;
+            position: relative;
         }
 
-        .left-side {
-            padding: 4rem;
+        /* ... existing styles ... */
+
+        pageFlip=new St.PageFlip(bookEl, {
+            width: 700,
+            height: 600,
+            size: 'fixed',
+            minWidth: 350,
+            maxWidth: 1000,
+            minHeight: 400,
+            maxHeight: 1500,
+            maxShadowOpacity: 0.5,
+            showCover: true,
+            mobileScrollSupport: false,
+            flippingTime: 1000, // Restored to 1000ms for smooth "physics" feel like the site
+            drawShadow: true,
+            useMouseEvents: true,
+            usePortrait: false,
+            autoSize: true
+        });
+
+        .page.--hard {
+            background-color: #1a1a1a;
+            border: none;
+        }
+
+        .page.--cover {
+            border-radius: 0 5px 5px 0;
+            /* Right radius for front cover in PageFlip usually, but standalone pages? */
+            /* Actually react-pageflip applies borderRadius via CSS on the container or page class? */
+            /* In BookResult.jsx: rounded-r-lg for cover */
+            border-radius: 0 8px 8px 0;
+        }
+
+        .page.--back {
+            border-radius: 8px 0 0 8px;
+            /* Left radius for back cover */
+        }
+
+        /* Textures */
+        .texture-leather {
+            position: absolute;
+            inset: 0;
+            background-image: url('https://www.transparenttextures.com/patterns/leather.png');
+            opacity: 0.6;
+            mix-blend-mode: multiply;
+            pointer-events: none;
+        }
+
+        .texture-paper {
+            position: absolute;
+            inset: 0;
+            background-image: url('https://www.transparenttextures.com/patterns/notebook.png');
+            opacity: 0.4;
+            mix-blend-mode: multiply;
+            pointer-events: none;
+        }
+
+        /* Shadows / Spine */
+        .spine-shadow-left {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 15px;
+            background: linear-gradient(to right, rgba(0, 0, 0, 0.4), transparent);
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        .spine-shadow-right {
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 15px;
+            background: linear-gradient(to left, rgba(0, 0, 0, 0.4), transparent);
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        .vignette {
+            position: absolute;
+            inset: 0;
+            box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.2);
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        /* --- Cover Design (Updated) --- */
+        .cover-content {
+            height: 100%;
             display: flex;
             flex-direction: column;
-            justify-content: center;
-            border-right: 1px solid rgba(0, 0, 0, 0.1);
+            position: relative;
         }
 
-        .right-side {
-            background: #000;
+        /* Top 65% Image */
+        .cover-image-section {
+            height: 65%;
+            width: 100%;
+            position: relative;
             overflow: hidden;
+            border-bottom: 4px solid rgba(202, 138, 4, 0.3);
+            /* yellow-600/30 */
         }
 
-        .right-side img {
+        .cover-image-section img {
             width: 100%;
             height: 100%;
             object-fit: cover;
+            opacity: 0.9;
+            transition: transform 1s;
         }
 
-        .part-num {
-            font-family: 'Cinzel', serif;
-            color: var(--primary);
-            margin-bottom: 1rem;
-            font-weight: bold;
+        .cover-overlay {
+            position: absolute;
+            inset: 0;
+            box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.6);
+            z-index: 10;
+            pointer-events: none;
         }
 
-        .story-text {
-            font-size: 1.1rem;
-            line-height: 1.8;
-            text-align: justify;
-        }
-
-        .story-text::first-letter {
-            font-size: 2.5rem;
-            float: left;
-            margin-right: 8px;
-            color: var(--primary);
-            font-family: 'Cinzel', serif;
-        }
-
-        .image-prompt {
-            font-size: 0.8rem;
-            color: #777;
-            margin-top: 1.5rem;
-            font-style: italic;
-            border-top: 1px solid rgba(0, 0, 0, 0.05);
-            padding-top: 0.5rem;
-        }
-
-        /* Capa Especial */
-        .cover-page {
-            grid-template-columns: 1fr !important;
-            text-align: center;
-        }
-
-        .cover-content {
-            padding: 2rem;
+        /* Bottom 35% Title */
+        .cover-text-section {
+            height: 35%;
+            background: #151515;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            background: var(--paper);
-            height: 100%;
-            width: 100%;
+            padding: 1.5rem;
+            text-align: center;
+            position: relative;
+        }
+
+        .edition-badge {
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: rgba(234, 179, 8, 0.6);
+            font-size: 0.65rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            font-family: var(--font-sans);
         }
 
         .cover-title {
-            font-family: 'Cinzel', serif;
-            font-size: 3.5rem;
-            color: var(--primary);
-            margin-bottom: 2rem;
-            text-transform: uppercase;
-            letter-spacing: 4px;
-        }
-
-        .cover-img-container {
-            width: 80%;
-            height: 350px;
+            font-family: var(--font-serif);
+            font-size: 2.25rem;
+            /* text-4xl approx */
+            font-weight: bold;
+            color: var(--yellow-100);
+            line-height: 1.1;
+            margin-bottom: 0.75rem;
+            text-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
             overflow: hidden;
-            border-radius: 10px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            padding: 0 1rem;
         }
 
-        .cover-img-container img {
+        .separator {
+            width: 8rem;
+            height: 1px;
+            background: rgba(202, 138, 4, 0.4);
+            margin: 0.5rem 0;
+        }
+
+        .author-tag {
+            font-family: var(--font-serif);
+            font-style: italic;
+            font-size: 0.875rem;
+            color: rgba(254, 240, 138, 0.4);
+            /* yellow-200/40 */
+        }
+
+        /* --- Content Pages --- */
+        /* Text Page (Paper) */
+        .text-page-inner {
+            height: 100%;
+            padding: 2rem 3rem;
+            /* p-12 approx */
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+            position: relative;
+            z-index: 20;
+            border-left: 1px solid #e3dccb;
+            /* md:border-l */
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .chapter-label {
+            font-family: var(--font-serif);
+            font-style: italic;
+            color: var(--slate-400);
+            font-size: 0.875rem;
+        }
+
+        .page-num-top {
+            font-family: var(--font-serif);
+            font-weight: bold;
+            color: var(--slate-300);
+            font-size: 0.75rem;
+        }
+
+        .story-text {
+            font-family: var(--font-body);
+            font-size: 1.1rem;
+            line-height: 1.8;
+            color: var(--slate-800);
+            text-align: justify;
+            letter-spacing: 0.025em;
+            /* tracking-wide */
+        }
+
+        .drop-cap {
+            float: left;
+            font-family: var(--font-serif);
+            font-size: 3rem;
+            /* text-5xl */
+            font-weight: bold;
+            color: var(--slate-900);
+            margin-right: 0.5rem;
+            margin-top: -0.5rem;
+            line-height: 1;
+        }
+
+        .decoration-bottom {
+            margin-top: auto;
+            padding-top: 2rem;
+            display: flex;
+            justify-content: center;
+            opacity: 0.3;
+            font-size: 1.25rem;
+        }
+
+        /* Image Page (Paper Full Bleed) */
+        .image-page-inner {
+            height: 100%;
+            width: 100%;
+            position: relative;
+            background-color: #fdfbf7;
+            border-right: 1px solid #e3dccb;
+            overflow: hidden;
+        }
+
+        .full-img {
             width: 100%;
             height: 100%;
             object-fit: cover;
         }
 
-        .controls {
-            margin-top: 2rem;
+        /* Only Text Pages get header/footer? Image pages have overlay number in React */
+        .image-pg-num-overlay {
+            position: absolute;
+            bottom: 1rem;
+            width: 100%;
             display: flex;
-            gap: 1rem;
+            justify-content: center;
+            z-index: 20;
+            pointer-events: none;
         }
 
-        button {
-            background: transparent;
-            border: 2px solid var(--primary);
-            color: white;
-            padding: 0.8rem 2rem;
-            cursor: pointer;
-            border-radius: 30px;
-            font-family: 'Cinzel';
-            transition: all 0.3s;
+        .pg-badge {
+            color: rgba(255, 255, 255, 0.9);
+            font-family: var(--font-serif);
+            font-size: 0.75rem;
+            font-weight: bold;
+            padding: 0.25rem 0.75rem;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 99px;
+            backdrop-filter: blur(4px);
         }
 
-        button:hover:not(:disabled) {
-            background: var(--primary);
-            box-shadow: 0 0 15px var(--primary);
+        /* Intro / Dedication */
+        .dedication-page {
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 2.5rem;
+            border-left: 1px solid #e3dccb;
         }
 
-        button:disabled {
-            opacity: 0.3;
+        .dedication-content {
+            max-width: 20rem;
         }
 
-        @keyframes fadeIn {
-            from {
-                opacity: 0;
-            }
+        .dedication-sep {
+            height: 1px;
+            width: 5rem;
+            background: #cbd5e1;
+            margin: 1.5rem auto;
+        }
 
-            to {
-                opacity: 1;
-            }
+        /* Back Cover */
+        .back-cover-inner {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            position: relative;
+            z-index: 10;
+            border-left: 8px solid var(--slate-900);
+            /* matches React border-l-8 */
         }
     </style>
 </head>
 
 <body>
+    <div class="app-bg-overlay"></div>
 
-    <div class="book" id="book-container">
-        <!-- JS will inject content here -->
+    <div id="loading-msg" class="loading">Carregando livro...</div>
+
+    <!-- Container for perspective -->
+    <div style="perspective: 1500px; display: flex; justify-content: center; align-items: center;">
+        <div id="book" class="flip-book">
+            <!-- Pages injected via JS -->
+        </div>
     </div>
 
+    <!-- Navigation Arrows -->
     <div class="controls">
-        <button id="btnP" onclick="changePage(-1)" disabled>Anterior</button>
-        <button id="btnN" onclick="changePage(1)">Próximo</button>
+        <button class="btn-nav" id="btnPrev">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M15 18l-6-6 6-6" />
+            </svg>
+        </button>
+        <button class="btn-nav" id="btnNext">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 18l6-6-6-6" />
+            </svg>
+        </button>
     </div>
 
     <script>
-        let currentState = {
-            story: null,
-            page: 0,
-            total: 0
-        };
+        // __STORY_DATA_INJECTION__
 
-        const bookEl = document.getElementById('book-container');
-        const btnP = document.getElementById('btnP');
-        const btnN = document.getElementById('btnN');
+        const bookEl = document.getElementById('book');
+        const loadingEl = document.getElementById('loading-msg');
+        let pageFlip;
 
-        async function loadStory() {
-            try {
-                const response = await fetch('./story.json');
-                const data = await response.json();
-                currentState.story = data;
-                currentState.total = data.chapters.length; // 0=Cover
-                renderBook(data);
-            } catch (error) {
-                console.error("Erro loading:", error);
-                document.body.innerHTML = '<h1 style="color:white">Erro ao carregar história. Verifique story.json</h1>';
+        async function init() {
+            let storyData = null;
+
+            if (window.embeddedStory) {
+                storyData = window.embeddedStory;
+            } else {
+                try {
+                    const response = await fetch('./story.json');
+                    storyData = await response.json();
+                } catch (e) {
+                    loadingEl.innerHTML = "Erro ao carregar história";
+                    return;
+                }
             }
+
+            if (!storyData) return;
+
+            buildBookDOM(storyData);
+
+            loadingEl.style.display = 'none';
+            bookEl.style.display = 'block';
+
+            // EXACT Dimensions from BookResult.jsx
+            // React: width={700} height={600}
+            // Note: HTML page-flip usually treats 'width' as Single Page Width.
+            // If React app is sending 700 to HTMLFlipBook, check if it means spread or page.
+            // react-pageflip docs: width = Width of the book (page).
+            // So each page is 700px wide. Open book = 1400px.
+
+            pageFlip = new St.PageFlip(bookEl, {
+                width: 700,
+                height: 600,
+                size: 'fixed',
+                minWidth: 350,
+                maxWidth: 1000,
+                minHeight: 400,
+                maxHeight: 1500,
+                maxShadowOpacity: 0.5,
+                showCover: true,
+                mobileScrollSupport: true, // Re-enable standard support like React app
+                flippingTime: 800, // Balanced speed
+                drawShadow: true,
+                useMouseEvents: true,
+                usePortrait: false,
+                autoSize: true
+            });
+
+            pageFlip.loadFromHTML(document.querySelectorAll('.page'));
+
+            document.getElementById('btnPrev').addEventListener('click', () => pageFlip.flipPrev());
+            document.getElementById('btnNext').addEventListener('click', () => pageFlip.flipNext());
         }
 
-        function renderBook(story) {
-            bookEl.innerHTML = '';
+        function buildBookDOM(story) {
+            let html = '';
 
-            // 1. Cover
-            const coverDiv = document.createElement('div');
-            coverDiv.className = 'page cover-page active';
-            coverDiv.id = 'p0';
-            coverDiv.innerHTML = `
+            // --- Page 0: Front Cover ---
+            html += `
+            <div class="page --hard --cover" data-density="hard">
+                <div class="texture-leather"></div>
                 <div class="cover-content">
-                    <div class="cover-title">${story.title}</div>
-                    <div class="cover-img-container">
-                        <img src="${story.cover_image}">
+                    <div class="spine-shadow-left"></div>
+                    
+                    <!-- Image Section (Top 65%) -->
+                    <div class="cover-image-section">
+                        <img src="${story.cover_image}" alt="Capa">
+                        <div class="cover-overlay"></div>
+                        <!-- Left Spine Overlay -->
+                         <div class="spine-shadow-left" style="width: 20px; z-index: 30; background: linear-gradient(to right, rgba(0,0,0,0.6), transparent);"></div>
                     </div>
-                    <div style="margin-top: 2rem; font-family: 'Cinzel'; font-size: 1.2rem; color: #555;">
-                        Uma História Imaginária
+
+                    <!-- Text Section (Bottom 35%) -->
+                    <div class="cover-text-section">
+                         <div class="texture-leather" style="mix-blend-mode: multiply; opacity: 0.6;"></div>
+                         <!-- Left Spine Overlay for bottom -->
+                         <div class="spine-shadow-left" style="width: 20px; z-index: 30; background: linear-gradient(to right, rgba(0,0,0,0.6), transparent);"></div>
+
+                         <div style="position: relative; z-index: 10; width: 100%; display: flex; flex-col; items-center;">
+                            <div class="edition-badge">Edição Especial</div>
+                            <div class="cover-title">${story.title}</div>
+                            <div class="separator" style="margin: 0.5rem auto;"></div>
+                            <div class="author-tag">Uma criação Imaginária</div>
+                         </div>
                     </div>
                 </div>
-            `;
-            bookEl.appendChild(coverDiv);
+            </div>`;
 
-            // 2. Chapters
-            story.chapters.forEach((chap, i) => {
-                const idx = i + 1;
-                const pageDiv = document.createElement('div');
-                pageDiv.className = 'page';
-                pageDiv.id = `p${idx}`;
-                pageDiv.innerHTML = `
-                    <div class="left-side">
-                        <div class="part-num">Capítulo ${idx}</div>
-                        <div class="story-text">${chap.text}</div>
+            // --- Page 1: Dedication (Left) ---
+            html += `
+            <div class="page" data-density="soft">
+                <div class="texture-paper"></div>
+                <div class="spine-shadow-right"></div>
+                <div class="dedication-page">
+                    <div class="dedication-content">
+                        <h2 style="font-family: 'Cinzel', serif; font-size: 1.5rem; color: #1e293b; margin-bottom: 1rem;">${story.title}</h2>
+                        <div class="dedication-sep"></div>
+                        <p style="font-family: 'Lora', serif; font-style: italic; color: #64748b;">"Para todos os viajantes da imaginação."</p>
                     </div>
-                    <div class="right-side"><img src="${chap.image}"></div>
-                `;
-                bookEl.appendChild(pageDiv);
+                </div>
+            </div>`;
+
+            // --- Page 2: Copyright (Right) ---
+            html += `
+            <div class="page" data-density="soft">
+                <div class="texture-paper"></div>
+                <div class="spine-shadow-left"></div>
+                <div style="height: 100%; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 2rem; border-left: 1px solid #e3dccb;">
+                    <div style="text-align: center; font-size: 0.65rem; color: #94a3b8; letter-spacing: 0.1em; text-transform: uppercase;">
+                        © ${new Date().getFullYear()} imaginária<br>Todos os direitos reservados
+                    </div>
+                </div>
+            </div>`;
+
+            // --- Chapters ---
+            story.chapters.forEach((chap, index) => {
+                const chapNum = index + 1;
+                // PageFlip numbering: Cover=0, Dedication=1, Copyright=2.
+                // Next spread: Left=3, Right=4.
+
+                // Image (Left)
+                html += `
+                <div class="page" data-density="soft">
+                    <div class="image-page-inner">
+                        <div class="texture-paper"></div>
+                        <div class="spine-shadow-right"></div>
+                        <img src="${chap.image}" class="full-img">
+                        <div class="vignette"></div>
+                        <div class="image-pg-num-overlay">
+                            <span class="pg-badge">${index * 2 + 1}</span>
+                        </div>
+                    </div>
+                </div>`;
+
+                // Text (Right)
+                const firstLetter = chap.text.charAt(0);
+                const restText = chap.text.slice(1);
+
+                html += `
+                <div class="page" data-density="soft">
+                    <div class="text-page-inner">
+                        <div class="texture-paper"></div>
+                        <div class="spine-shadow-left"></div>
+                        
+                        <div class="page-header">
+                            <span class="chapter-label">Capítulo ${chapNum}</span>
+                            <span class="page-num-top">${index * 2 + 2}</span>
+                        </div>
+                        
+                        <div class="story-text">
+                            <span class="drop-cap">${firstLetter}</span>${restText}
+                        </div>
+                        
+                        <div class="decoration-bottom">✨</div>
+                    </div>
+                </div>`;
             });
+
+            // --- Buffer Page if needed ---
+            // Current pages: 1(Cover) + 2(Intro) + 2*N(Chapters).
+            // Total = odd number count of pages?
+            // PageFlip counts pages 0..Total.
+            // If total pages is Even, last page is Left.
+            // We want Back Cover to be Right (or typically standard books back cover is "Left" of the closed book? No, Back Cover is Page N).
+            // Let's just append a blank page + Back Cover. The library handles geometry.
+
+            html += `<div class="page" data-density="soft"><div class="texture-paper"></div></div>`;
+
+            // --- Back Cover ---
+            html += `
+            <div class="page --hard --back" data-density="hard">
+                <div class="texture-leather"></div>
+                <div class="back-cover-inner">
+                    <div class="spine-shadow-right"></div>
+                    <div style="color: rgba(234, 179, 8, 0.4); text-transform: uppercase; letter-spacing: 0.2em; font-size: 0.875rem; margin-bottom: 1rem; font-family: 'Inter', sans-serif;">Fim da História</div>
+                    <div style="width: 2rem; height: 2rem; border-radius: 50%; border: 2px solid rgba(234, 179, 8, 0.2); display: flex; align-items: center; justify-content: center; color: rgba(234, 179, 8, 0.2);">★</div>
+                    <div style="margin-top: 3rem; font-size: 0.75rem; color: #475569;">Generated by Imaginária</div>
+                </div>
+            </div>`;
+
+            bookEl.innerHTML = html;
         }
 
-        function changePage(d) {
-            const nextP = currentState.page + d;
-            if (nextP < 0 || nextP > currentState.total) return;
-
-            document.getElementById(`p${currentState.page}`).classList.remove('active');
-            currentState.page = nextP;
-            document.getElementById(`p${currentState.page}`).classList.add('active');
-
-            updateControls();
-        }
-
-        function updateControls() {
-            btnP.disabled = currentState.page === 0;
-            btnN.disabled = currentState.page === currentState.total;
-        }
-
-        loadStory();
+        init();
     </script>
 </body>
 

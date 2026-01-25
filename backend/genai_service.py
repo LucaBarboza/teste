@@ -8,7 +8,8 @@ from google.genai import types
 from pydantic import BaseModel, Field
 
 # Load environment variables
-load_dotenv()
+# Load environment variables
+load_dotenv(override=True)
 
 # Configure Client
 # Ensure GEMINI_API_KEY is set in your environment

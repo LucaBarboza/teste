@@ -6,7 +6,10 @@ from pydantic import BaseModel
 import uvicorn
 
 # Import the service
-from genai_service import generate_story_with_gemini, generate_image_with_gemini
+try:
+    from backend.genai_service import generate_story_with_gemini, generate_image_with_gemini
+except ImportError:
+    from genai_service import generate_story_with_gemini, generate_image_with_gemini
 import shutil
 import uuid
 import os
@@ -31,7 +34,7 @@ if not os.path.exists(IMG_DIR):
     os.makedirs(IMG_DIR)
 
 # Ensure saved stories directory exists
-STORIES_DIR = "saved_stories"
+STORIES_DIR = "story_generated"
 if not os.path.exists(STORIES_DIR):
     os.makedirs(STORIES_DIR)
 
@@ -230,7 +233,16 @@ async def save_story_endpoint(story: SaveStoryRequest):
         # 3. Generate index.html (Standalone Site)
         template_path = os.path.join("backend", "template_site.html")
         if os.path.exists(template_path):
-            shutil.copy2(template_path, os.path.join(story_path, "index.html"))
+            with open(template_path, "r", encoding="utf-8") as t:
+                html_content = t.read()
+            
+            # Inject data
+            json_str = json.dumps(final_story_data, ensure_ascii=False)
+            injection_code = f"window.embeddedStory = {json_str};"
+            html_content = html_content.replace("// __STORY_DATA_INJECTION__", injection_code)
+            
+            with open(os.path.join(story_path, "index.html"), "w", encoding="utf-8") as f:
+                f.write(html_content)
 
         return {
             "status": "success",
