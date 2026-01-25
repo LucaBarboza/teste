@@ -9,7 +9,10 @@ export function StoryProvider({ children }) {
         return saved ? JSON.parse(saved) : [];
     });
 
-    const [activeCharacter, setActiveCharacter] = useState(null);
+    const [activeCharacter, setActiveCharacter] = useState(() => {
+        const saved = localStorage.getItem('imaginaria_active_character');
+        return saved ? JSON.parse(saved) : null;
+    });
 
     const [generationState, setGenerationState] = useState({
         isLoading: false,
@@ -22,6 +25,15 @@ export function StoryProvider({ children }) {
     useEffect(() => {
         localStorage.setItem('imaginaria_characters', JSON.stringify(characters));
     }, [characters]);
+
+    // Persist active character
+    useEffect(() => {
+        if (activeCharacter) {
+            localStorage.setItem('imaginaria_active_character', JSON.stringify(activeCharacter));
+        } else {
+            localStorage.removeItem('imaginaria_active_character');
+        }
+    }, [activeCharacter]);
 
     const addCharacter = useCallback((newCharacter) => {
         setCharacters(prev => [...prev, { ...newCharacter, id: crypto.randomUUID(), createdAt: new Date().toISOString() }]);
@@ -40,6 +52,16 @@ export function StoryProvider({ children }) {
     }, [characters]);
 
     const startGeneration = useCallback(async (storyData) => {
+        if (!storyData || !storyData.character) {
+            console.error("startGeneration called without storyData or character", storyData);
+            setGenerationState(prev => ({
+                ...prev,
+                isLoading: false,
+                error: "Dados da história incompletos."
+            }));
+            return;
+        }
+
         setGenerationState(prev => ({
             ...prev,
             isLoading: true,
@@ -47,48 +69,182 @@ export function StoryProvider({ children }) {
             logs: ["Iniciando motor criativo...", "Conectando ao núcleo de imaginação..."]
         }));
 
-        // TODO: Implement actual API call logic here
-        // Simulating Agentic Process
-        const steps = [
-            "Analisando perfil do personagem...",
-            "Construindo universo narrativo...",
-            "Escrevendo capítulo 1...",
-            "Gerando ilustrações...",
-            "Finalizando livro..."
-        ];
+        try {
+            // 1. Prepare Data
+            const formData = new FormData();
+            formData.append('nome', storyData.character.nickname);
+            formData.append('estilo', storyData.style);
+            formData.append('universo', storyData.universe);
+            formData.append('genero', storyData.genre);
+            if (storyData.description) {
+                formData.append('descricao', storyData.description);
+            }
 
-        for (let i = 0; i < steps.length; i++) {
-            await new Promise(r => setTimeout(r, 1500));
             setGenerationState(prev => ({
                 ...prev,
-                logs: [...prev.logs, steps[i]]
+                logs: [...prev.logs, "Processando perfil do herói..."]
+            }));
+
+            // Convert blob URLs back to Blobs to send to API
+            if (storyData.character.photos && storyData.character.photos.length > 0) {
+                for (const photoUrl of storyData.character.photos) {
+                    const response = await fetch(photoUrl);
+                    const blob = await response.blob();
+                    formData.append('imagens', blob, "reference.jpg");
+                }
+            }
+
+            setGenerationState(prev => ({
+                ...prev,
+                logs: [...prev.logs, "Enviando dados para o oráculo (Gemini)..."]
+            }));
+
+            // 2. Call Story Generation API
+            const response = await fetch('/api/generate-story', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || 'Falha ao gerar história');
+            }
+
+            const result = await response.json();
+            const generatedStory = result.data;
+
+            // 3. Image Generation (REAL)
+            setGenerationState(prev => ({
+                ...prev,
+                logs: [...prev.logs, "História escrita com sucesso!", "Iniciando geração das ilustrações..."]
+            }));
+
+            // Fetch reference image blobs once to reuse
+            const referenceBlobs = [];
+            if (storyData.character.photos && storyData.character.photos.length > 0) {
+                for (const photoUrl of storyData.character.photos) {
+                    const res = await fetch(photoUrl);
+                    const blob = await res.blob();
+                    referenceBlobs.push(blob);
+                }
+            }
+
+            // Helper to generate a single image
+            const generateSingleImage = async (prompt, descriptor) => {
+                setGenerationState(prev => ({
+                    ...prev,
+                    logs: [...prev.logs, `Pintando: ${descriptor}...`]
+                }));
+
+                const imgFormData = new FormData();
+                imgFormData.append('prompt', prompt);
+                imgFormData.append('person_name', storyData.character.nickname);
+                imgFormData.append('universe_context', storyData.universe);
+
+                referenceBlobs.forEach((blob) => {
+                    imgFormData.append('reference_images', blob, "ref.jpg");
+                });
+
+                try {
+                    const res = await fetch('/api/generate-image', {
+                        method: 'POST',
+                        body: imgFormData
+                    });
+
+                    if (!res.ok) throw new Error('Falha na geração de imagem');
+                    const data = await res.json();
+                    return data.image_url; // Returns /images/uuid.png
+                } catch (e) {
+                    console.error(`Erro ao gerar imagem (${descriptor}):`, e);
+                    return `https://placehold.co/600x400/e3dccb/2a1a10?text=Erro:+${encodeURIComponent(descriptor)}`;
+                }
+            };
+
+            // Generate Cover
+            const coverUrl = await generateSingleImage(generatedStory.cover_prompt, "Capa do Livro");
+
+            // Generate Chapters
+            const chapterImages = [];
+            for (let i = 0; i < generatedStory.parts.length; i++) {
+                const part = generatedStory.parts[i];
+                const prompt = part[1];
+                const imgUrl = await generateSingleImage(prompt, `Cena ${i + 1}`);
+                chapterImages.push(imgUrl);
+            }
+
+            const finalResult = {
+                title: generatedStory.title,
+                cover_image: coverUrl,
+                parts: generatedStory.parts,
+                chapters: chapterImages.map((url, index) => ({
+                    image_url: url
+                }))
+            };
+
+            // Auto-save the story
+            saveStory(finalResult);
+
+            setGenerationState(prev => ({
+                ...prev,
+                isLoading: false,
+                logs: [...prev.logs, "Livro finalizado com ilustrações!", "Salvo no grimório."],
+                result: finalResult
+            }));
+
+        } catch (error) {
+            console.error("Generation Error:", error);
+            setGenerationState(prev => ({
+                ...prev,
+                isLoading: false,
+                error: error.message,
+                logs: [...prev.logs, `Erro: ${error.message}`]
             }));
         }
-
-        setGenerationState(prev => ({
-            ...prev,
-            isLoading: false,
-            result: {
-                title: `A Lenda de ${storyData.character.nickname}`,
-                cover_image: "https://images.unsplash.com/photo-1626814026160-2237a95fc5a0?q=80&w=600&auto=format&fit=crop",
-                parts: [
-                    ["Era uma vez, em um universo de possibilidades infinitas, onde a magia e a tecnologia dançavam sob a luz de luas gêmeas. Nosso herói, com coragem no coração e determinação no olhar, estava prestes a iniciar uma jornada que mudaria o destino de todos."],
-                    ["O caminho era tortuoso e cheio de desafios. Criaturas sombrias espreitavam nas sombras, mas a luz da esperança guiava seus passos. Cada decisão moldava o futuro, e cada aliado encontrado fortalecia a vontade de vencer."],
-                    ["No fim, não foi apenas a vitória sobre o mal que importou, mas as amizades forjadas e as lições aprendidas. A lenda deste herói ecoaria por gerações, inspirando novos aventureiros a olharem para o horizonte e sonharem."]
-                ],
-                chapters: [
-                    { image_url: "https://images.unsplash.com/photo-1535905557558-afc4877a26fc?q=80&w=600&auto=format&fit=crop" },
-                    { image_url: "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?q=80&w=600&auto=format&fit=crop" },
-                    { image_url: "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?q=80&w=600&auto=format&fit=crop" }
-                ]
-            }
-        }));
     }, []);
 
     const saveStory = useCallback(async (result) => {
         console.log("Saving story...", result);
-        // Implement actual save logic or mock
-        return Promise.resolve();
+        try {
+            const savePayload = {
+                title: result.title,
+                cover_image_url: result.cover_image,
+                chapters: result.chapters.map(c => ({
+                    text: result.parts.find(p => p[1].includes(c.image_url.split('text=')[1]?.replace(/\+/g, ' ') || ''))?.[0] || "", // Try to find text matching prompt or fallback
+                    image_url: c.image_url
+                }))
+            };
+
+            // Fix: Map text correctly from parts since chapters might not have it directly if constructed differently
+            // Re-constructing payload to be safer based on how finalResult is built in startGeneration
+            const payload = {
+                title: result.title,
+                cover_image_url: result.cover_image,
+                chapters: result.parts.map((part, index) => ({
+                    text: part[0],
+                    image_url: result.chapters[index].image_url
+                }))
+            };
+
+            const response = await fetch('/api/save-story', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                throw new Error('Falha ao salvar história no backend');
+            }
+
+            const data = await response.json();
+            console.log("Story saved successfully:", data);
+            return data;
+
+        } catch (error) {
+            console.error("Error saving story:", error);
+            // Don't throw to avoid breaking the UI flow if save fails, just log
+        }
     }, []);
 
     const value = {

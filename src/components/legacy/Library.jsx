@@ -11,7 +11,7 @@ const Library = ({ onOpenStory }) => {
 
     const fetchStories = async () => {
         try {
-            const res = await fetch('http://localhost:8000/api/stories');
+            const res = await fetch('/api/stories');
             const data = await res.json();
             setStories(data);
         } catch (error) {
@@ -24,7 +24,7 @@ const Library = ({ onOpenStory }) => {
     const loadStoryDetails = async (id) => {
         try {
             // Fetch full details to play in the app
-            const res = await fetch(`http://localhost:8000/api/stories/${id}`);
+            const res = await fetch(`/api/stories/${id}`);
             const data = await res.json();
             onOpenStory(data);
         } catch (e) {
@@ -36,7 +36,7 @@ const Library = ({ onOpenStory }) => {
     const openStandaloneSite = (id) => {
         // The backend serves it at /stories/{id}/index.html
         // We open it in a new tab
-        window.open(`http://localhost:8000/stories/${id}/index.html`, '_blank');
+        window.open(`/stories/${id}/index.html`, '_blank');
     };
 
     if (loading) return <div className="text-white text-center p-10">Carregando sua biblioteca...</div>;
@@ -64,7 +64,7 @@ const Library = ({ onOpenStory }) => {
                             {/* Cover Image */}
                             <div
                                 className="aspect-[2/3] w-full bg-cover bg-center cursor-pointer relative"
-                                style={{ backgroundImage: `url(http://localhost:8000${story.cover})` }}
+                                style={{ backgroundImage: `url(${story.cover})` }}
                                 onClick={() => loadStoryDetails(story.id)}
                             >
                                 <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-all" />

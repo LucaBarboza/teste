@@ -9,16 +9,24 @@ export default function CharacterSetup({ onNext, onBack }) {
     const [photos, setPhotos] = useState([]);
     const fileInputRef = useRef(null);
 
-    const handleFileChange = (e) => {
+    const handleFileChange = async (e) => {
         const files = Array.from(e.target.files);
         if (files.length + photos.length > 3) {
             alert("Máximo de 3 fotos permitidas.");
             return;
         }
 
-        const newPhotos = files.map(file => ({
-            url: URL.createObjectURL(file), // Note: In a real persistent app this needs to be a real storage URL or Base64
-            file
+        const newPhotos = await Promise.all(files.map(async (file) => {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    resolve({
+                        url: reader.result, // Base64 Data URL
+                        file
+                    });
+                };
+                reader.readAsDataURL(file);
+            });
         }));
 
         setPhotos([...photos, ...newPhotos]);
@@ -32,7 +40,7 @@ export default function CharacterSetup({ onNext, onBack }) {
         if (!nickname.trim()) return;
         addCharacter({
             nickname,
-            photos: photos.map(p => p.url)
+            photos: photos.map(p => p.url) // Now passing Data URLs
         });
         onNext();
     };

@@ -33,7 +33,7 @@ function AppContent() {
 
     const handleWizardComplete = () => {
         setView('LOADING');
-        startGeneration();
+        // startGeneration is called inside StoryWizard with data
     };
 
     const currentView = () => {
@@ -64,7 +64,7 @@ function AppContent() {
                     animate={{ opacity: 1, filter: 'blur(0px)' }}
                     exit={{ opacity: 0, filter: 'blur(10px)' }}
                     transition={{ duration: 0.4 }}
-                    className="w-full"
+                    className="w-full min-h-screen"
                 >
                     {currentView()}
                 </motion.div>

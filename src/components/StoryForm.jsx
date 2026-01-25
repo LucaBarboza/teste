@@ -53,14 +53,14 @@ export default function StoryForm() {
             data.append('reference_images', img);
         });
 
-        const response = await fetch('http://localhost:8000/api/generate-image', {
+        const response = await fetch('/api/generate-image', {
             method: 'POST',
             body: data,
         });
 
         const result = await response.json();
         if (response.ok && result.status === 'success') {
-            return `http://localhost:8000${result.image_url}`;
+            return `${result.image_url}`;
         } else {
             throw new Error(result.detail || 'Erro na geração de imagem');
         }
@@ -85,7 +85,7 @@ export default function StoryForm() {
 
         try {
             // 1. Generate Story Text
-            const response = await fetch('http://localhost:8000/api/generate-story', {
+            const response = await fetch('/api/generate-story', {
                 method: 'POST',
                 body: data,
             });
